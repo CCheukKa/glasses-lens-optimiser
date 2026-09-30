@@ -3,8 +3,10 @@ import { PathType, RayTracer, Scene } from "./lib/RayTracer";
 import { Vector2 } from "./lib/MathExtra";
 import { GradientAscent } from "./lib/GradientAscent";
 
-const LEARNING_RATE = 0.001;
+const LEARNING_RATE = 0.0001;
 const MAX_ITERATIONS = 1000000;
+const WORLD_TO_CANVAS_SCALE = 100;
+const OUTGOING_RAY_LENGTH = 5;
 const relu = (x: number): number => Math.max(0, x);
 const leakyRelu = (x: number): number => (x > 0 ? x : 0.01 * x);
 const tanh = (x: number): number => Math.tanh(x);
@@ -25,6 +27,13 @@ const lens = {
 };
 const target = { position: new Vector2(0, -2.5) };
 const scene = new Scene(lightSources, lens, target);
+
+function toCanvasPoint(point: Vector2, canvas: HTMLCanvasElement): Vector2 {
+    return new Vector2(
+        point.x * WORLD_TO_CANVAS_SCALE + canvas.width / 2,
+        -point.y * WORLD_TO_CANVAS_SCALE + canvas.height / 2,
+    );
+}
 
 async function waitForNextFrame(): Promise<void> {
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -60,8 +69,9 @@ function drawScene(scene: Scene) {
     // draw light sources
     const lightSourceRadius = 2;
     scene.lightSources.forEach(lightSource => {
+        const position = toCanvasPoint(lightSource.position, canvas);
         ctx.beginPath();
-        ctx.arc(lightSource.position.x * 100 + canvas.width / 2, -lightSource.position.y * 100 + canvas.height / 2, lightSourceRadius, 0, 2 * Math.PI);
+        ctx.arc(position.x, position.y, lightSourceRadius, 0, 2 * Math.PI);
         ctx.fillStyle = "yellow";
         ctx.fill();
     });
@@ -71,10 +81,12 @@ function drawScene(scene: Scene) {
     const normalLength = 0.4;
     const normalThickness = 1;
     scene.discretisedLens.forEach(surface => {
+        const start = toCanvasPoint(surface.start, canvas);
+        const end = toCanvasPoint(surface.end, canvas);
         // draw surface
         ctx.beginPath();
-        ctx.moveTo(surface.start.x * 100 + canvas.width / 2, -surface.start.y * 100 + canvas.height / 2);
-        ctx.lineTo(surface.end.x * 100 + canvas.width / 2, -surface.end.y * 100 + canvas.height / 2);
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
         ctx.strokeStyle = "cyan";
         ctx.lineWidth = surfaceThickness;
         ctx.stroke();
@@ -82,9 +94,11 @@ function drawScene(scene: Scene) {
         // draw normal at center of surface
         const center = surface.start.add(surface.end).scale(0.5);
         const normalEnd = center.add(surface.normal.scale(normalLength));
+        const canvasCenter = toCanvasPoint(center, canvas);
+        const canvasNormalEnd = toCanvasPoint(normalEnd, canvas);
         ctx.beginPath();
-        ctx.moveTo(center.x * 100 + canvas.width / 2, -center.y * 100 + canvas.height / 2);
-        ctx.lineTo(normalEnd.x * 100 + canvas.width / 2, -normalEnd.y * 100 + canvas.height / 2);
+        ctx.moveTo(canvasCenter.x, canvasCenter.y);
+        ctx.lineTo(canvasNormalEnd.x, canvasNormalEnd.y);
         ctx.strokeStyle = "magenta";
         ctx.lineWidth = normalThickness;
         ctx.stroke();
@@ -92,8 +106,9 @@ function drawScene(scene: Scene) {
 
     // draw target
     const targetRadius = 5;
+    const targetPosition = toCanvasPoint(scene.target.position, canvas);
     ctx.beginPath();
-    ctx.arc(scene.target.position.x * 100 + canvas.width / 2, -scene.target.position.y * 100 + canvas.height / 2, targetRadius, 0, 2 * Math.PI);
+    ctx.arc(targetPosition.x, targetPosition.y, targetRadius, 0, 2 * Math.PI);
     ctx.fillStyle = "red";
     ctx.fill();
 
@@ -103,14 +118,18 @@ function drawScene(scene: Scene) {
         ctx.beginPath();
         ray.forEach(segment => {
             if (segment.type === PathType.Intersection) {
-                ctx.moveTo(segment.start.x * 100 + canvas.width / 2, -segment.start.y * 100 + canvas.height / 2);
-                ctx.lineTo(segment.end.x * 100 + canvas.width / 2, -segment.end.y * 100 + canvas.height / 2);
+                const start = toCanvasPoint(segment.start, canvas);
+                const end = toCanvasPoint(segment.end, canvas);
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
             } else if (segment.type === PathType.Outgoing) {
-                ctx.moveTo(segment.start.x * 100 + canvas.width / 2, -segment.start.y * 100 + canvas.height / 2);
-                ctx.lineTo(
-                    (segment.start.x + segment.direction.x * 2) * 500 + canvas.width / 2,
-                    -(segment.start.y + segment.direction.y * 2) * 500 + canvas.height / 2,
+                const start = toCanvasPoint(segment.start, canvas);
+                const end = toCanvasPoint(
+                    segment.start.add(segment.direction.scale(OUTGOING_RAY_LENGTH)),
+                    canvas,
                 );
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
             }
         });
         ctx.strokeStyle = "yellow";
