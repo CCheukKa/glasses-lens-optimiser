@@ -1,4 +1,4 @@
-import { Vector2 } from "./Vector";
+import { Vector2 } from "./MathExtra";
 
 type LightSource = {
     position: Vector2;
@@ -7,7 +7,7 @@ type LightSource = {
 type Lens = {
     position: Vector2;
     refractiveIndex: number;
-    function: (x: number) => number;
+    readonly function: (x: number) => number;
 };
 type Target = {
     position: Vector2;
@@ -47,11 +47,17 @@ export class Scene {
         return this._discretisedLens;
     }
 
-    private discretiseLens(sampleDensity: number = 10, traceBoundaryRadius: number = 2): DiscretisedLens {
-        const points = Array.from({ length: sampleDensity * traceBoundaryRadius }, (_, i) => {
-            const x = -traceBoundaryRadius + (i / (sampleDensity * traceBoundaryRadius - 1)) * (2 * traceBoundaryRadius);
+    public setLensFunction(newFunction: (x: number) => number) {
+        this._lens = { ...this._lens, function: newFunction };
+        this._discretisedLens = this.discretiseLens();
+    }
+
+    private discretiseLens(sampleDensity: number = 100, traceBoundaryRadius: number = 2): DiscretisedLens {
+        const pointCount = Math.ceil(Math.max(2, sampleDensity * traceBoundaryRadius));
+        const points = Array.from({ length: pointCount }, (_, i) => {
+            const x = -traceBoundaryRadius + (i / (pointCount - 1)) * (2 * traceBoundaryRadius);
             const y = this.lens.function(x);
-            return new Vector2(x, y);
+            return this.lens.position.add(new Vector2(x, y));
         });
         const lensSurfaces: LensSurface[] = [];
         for (let i = 0; i < points.length - 1; i++) {
@@ -64,22 +70,77 @@ export class Scene {
     }
 }
 
-type Path = {
-    start: Vector2;
-    end: Vector2;
-} | {
-    start: Vector2;
-    direction: Vector2;
-};
-type Ray = Path[];
+export enum PathType {
+    Intersection = "Intersection",
+    Outgoing = "Outgoing",
+}
+type IntersectionPath = { type: PathType.Intersection; start: Vector2; end: Vector2; };
+type OutgoingPath = { type: PathType.Outgoing; start: Vector2; direction: Vector2 };
+type Ray = [...IntersectionPath[], OutgoingPath];
 export class RayTracer {
-    public traceBoundaryX = 2;
-    public traceBoundaryY = 2;
-
-    public traceScene(scene: Scene): Ray[] {
-        return scene.lightSources.map(lightSource => this.traceRay(lightSource, scene.discretisedLens));
+    public static traceScene(scene: Scene): Ray[] {
+        return scene.lightSources.map(lightSource =>
+            this.traceRay(lightSource, scene.discretisedLens, scene.lens.refractiveIndex),
+        );
     }
-    private traceRay(lightSource: LightSource, lens: DiscretisedLens): Ray {
-        return [];
+
+    private static traceRay(lightSource: LightSource, lens: DiscretisedLens, refractiveIndex: number): Ray {
+        let nearestIntersection: { point: Vector2; surface: LensSurface; distance: number } | undefined;
+
+        for (const surface of lens) {
+            const intersection = this.intersectRayWithSurface(lightSource.position, lightSource.direction, surface);
+            if (intersection && (!nearestIntersection || intersection.distance < nearestIntersection.distance)) {
+                nearestIntersection = { ...intersection, surface };
+            }
+        }
+
+        if (!nearestIntersection) {
+            return [{ type: PathType.Outgoing, start: lightSource.position, direction: lightSource.direction }];
+        }
+
+        const incoming = lightSource.direction;
+        let normal = nearestIntersection.surface.normal;
+        if (incoming.dot(normal) > 0) {
+            normal = normal.scale(-1);
+        }
+
+        const eta = 1 / refractiveIndex;
+        const cosineIncident = -incoming.dot(normal);
+        const sineSquaredTransmitted = eta * eta * (1 - cosineIncident * cosineIncident);
+        const outgoing = sineSquaredTransmitted > 1
+            ? incoming.subtract(normal.scale(2 * incoming.dot(normal))).normalised()
+            : incoming
+                .scale(eta)
+                .add(normal.scale(eta * cosineIncident - Math.sqrt(1 - sineSquaredTransmitted)))
+                .normalised();
+
+        return [
+            { type: PathType.Intersection, start: lightSource.position, end: nearestIntersection.point },
+            { type: PathType.Outgoing, start: nearestIntersection.point, direction: outgoing },
+        ];
+    }
+
+    private static intersectRayWithSurface(
+        origin: Vector2,
+        direction: Vector2,
+        surface: LensSurface,
+    ): { point: Vector2; distance: number } | undefined {
+        const surfaceDirection = surface.end.subtract(surface.start);
+        const denominator = direction.x * surfaceDirection.y - direction.y * surfaceDirection.x;
+        if (Math.abs(denominator) < 1e-10) {
+            return undefined;
+        }
+
+        const offset = surface.start.subtract(origin);
+        const rayDistance = (offset.x * surfaceDirection.y - offset.y * surfaceDirection.x) / denominator;
+        const surfaceDistance = (offset.x * direction.y - offset.y * direction.x) / denominator;
+        if (rayDistance < 1e-10 || surfaceDistance < -1e-10 || surfaceDistance > 1 + 1e-10) {
+            return undefined;
+        }
+
+        return {
+            point: origin.add(direction.scale(rayDistance)),
+            distance: rayDistance,
+        };
     }
 }

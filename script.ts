@@ -1,8 +1,9 @@
 import { NeuralNetwork } from "./lib/NeuralNetwork";
-import { RayTracer, Scene } from "./lib/RayTracer";
-import { Vector2 } from "./lib/Vector";
+import { PathType, RayTracer, Scene } from "./lib/RayTracer";
+import { Vector2 } from "./lib/MathExtra";
+import { GradientAscent } from "./lib/GradientAscent";
 
-const neuralNetwork = new NeuralNetwork([1, 3, 5, 3, 1]);
+const neuralNetwork = new NeuralNetwork([1, 3, 5, 5, 3, 1]);
 
 const lightSourceXStart = -1;
 const lightSourceXEnd = 1;
@@ -14,13 +15,12 @@ const lightSources = Array.from({ length: lightSourceCount }, (_, i) => {
 const lens = {
     position: new Vector2(0, 0),
     refractiveIndex: 1.5,
-    function: (x: number) => neuralNetwork.predict([x])[0]
+    function: (x: number) => neuralNetwork.predict([x])[0],
 };
 const target = { position: new Vector2(0, -1) };
 const scene = new Scene(lightSources, lens, target);
 
 drawScene(scene);
-
 function drawScene(scene: Scene) {
     const canvas = document.getElementById("myCanvas") as HTMLCanvasElement;
     const ctx = canvas.getContext("2d");
@@ -71,17 +71,20 @@ function drawScene(scene: Scene) {
     ctx.fill();
 
     // draw rays
-    const rayTracer = new RayTracer();
-    const rays = rayTracer.traceScene(scene);
+    const rays = RayTracer.traceScene(scene);
+    console.log("Rays:", rays);
     rays.forEach(ray => {
         ctx.beginPath();
         ray.forEach(segment => {
-            if ('start' in segment && 'end' in segment) {
+            if (segment.type === PathType.Intersection) {
                 ctx.moveTo(segment.start.x * 100 + canvas.width / 2, -segment.start.y * 100 + canvas.height / 2);
                 ctx.lineTo(segment.end.x * 100 + canvas.width / 2, -segment.end.y * 100 + canvas.height / 2);
-            } else if ('start' in segment && 'direction' in segment) {
+            } else if (segment.type === PathType.Outgoing) {
                 ctx.moveTo(segment.start.x * 100 + canvas.width / 2, -segment.start.y * 100 + canvas.height / 2);
-                ctx.lineTo(segment.start.x * 100 + canvas.width / 2 + segment.direction.x * 20, -segment.start.y * 100 + canvas.height / 2 + segment.direction.y * 20);
+                ctx.lineTo(
+                    (segment.start.x + segment.direction.x * 2) * 100 + canvas.width / 2,
+                    -(segment.start.y + segment.direction.y * 2) * 100 + canvas.height / 2,
+                );
             }
         });
         ctx.strokeStyle = "yellow";
@@ -89,3 +92,8 @@ function drawScene(scene: Scene) {
         ctx.stroke();
     });
 }
+
+console.log(GradientAscent.evaluateLoss(neuralNetwork, scene));
+console.log(GradientAscent.computeGradient(neuralNetwork, scene));
+const updatedNeuralNetwork = GradientAscent.gradientAscent(neuralNetwork, scene, 0.01, 1000);
+console.log(GradientAscent.evaluateLoss(updatedNeuralNetwork, scene));

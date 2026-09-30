@@ -1,3 +1,12 @@
+export namespace MathExtra {
+    export function distanceBetweenRayAndPoint(ray: { start: Vector2, direction: Vector2 }, point: Vector2): number {
+        const rayToPoint = point.subtract(ray.start);
+        const projectionLength = rayToPoint.dot(ray.direction.normalised());
+        const closestPointOnRay = ray.start.add(ray.direction.normalised().scale(projectionLength));
+        return point.subtract(closestPointOnRay).magnitude();
+    }
+}
+
 export class Vector2 {
     public x: number;
     public y: number;
