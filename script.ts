@@ -5,6 +5,8 @@ import { GradientAscent, OptimiserType } from "./lib/GradientAscent";
 
 const LEARNING_RATE = 0.005;
 const MAX_ITERATIONS = 5000;
+const AUTO_STOP_PATIENCE = 500;
+const LOSS_IMPROVEMENT_TOLERANCE = 1e-5;
 const OPTIMISER = OptimiserType.Adam;
 const WORLD_TO_CANVAS_SCALE = 100;
 const OUTGOING_RAY_LENGTH = 5;
@@ -47,10 +49,14 @@ train();
 
 async function train(): Promise<void> {
     drawScene(scene);
-    console.log("Initial loss:", GradientAscent.evaluateLoss(neuralNetwork, scene));
+    const initialLoss = GradientAscent.evaluateLoss(neuralNetwork, scene);
+    console.log("Initial loss:", initialLoss);
     await waitForNextFrame();
 
     const optimiser = GradientAscent.createOptimiser(OPTIMISER, neuralNetwork);
+    let bestLoss = initialLoss;
+    let stagnantIterations = 0;
+
     for await (const progress of GradientAscent.gradientAscentAsync(
         neuralNetwork,
         scene,
@@ -63,9 +69,28 @@ async function train(): Promise<void> {
             console.log(`Iteration ${progress.iteration}, loss: ${progress.loss}`);
         }
         await waitForNextFrame();
+
+        if (!Number.isFinite(progress.loss)) {
+            console.warn(`Stopping training: loss became ${progress.loss}.`);
+            break;
+        }
+
+        if (bestLoss - progress.loss > LOSS_IMPROVEMENT_TOLERANCE) {
+            bestLoss = progress.loss;
+            stagnantIterations = 0;
+        } else {
+            stagnantIterations++;
+        }
+
+        if (stagnantIterations >= AUTO_STOP_PATIENCE) {
+            console.log(
+                `Stopping training: no meaningful improvement for ${AUTO_STOP_PATIENCE} iterations.`,
+            );
+            break;
+        }
     }
 
-    console.log("Training complete. Final loss:", GradientAscent.evaluateLoss(neuralNetwork, scene));
+    console.log("Training complete. Final loss:", bestLoss);
 }
 
 function drawScene(scene: Scene) {
