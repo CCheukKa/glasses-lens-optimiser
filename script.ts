@@ -16,14 +16,14 @@ const lightSourceXEnd = 1;
 const lightSourceCount = 20;
 const lightSources = Array.from({ length: lightSourceCount }, (_, i) => {
     const x = lightSourceXStart + (i / (lightSourceCount - 1)) * (lightSourceXEnd - lightSourceXStart);
-    return { position: new Vector2(x, 2), direction: new Vector2(0, -1) };
+    return { position: new Vector2(x, 2.5), direction: new Vector2(0, -1) };
 });
 const lens = {
-    position: new Vector2(0, 0),
+    position: new Vector2(0, 1),
     refractiveIndex: 1.5,
     function: (x: number) => neuralNetwork.predict([x])[0],
 };
-const target = { position: new Vector2(0, -1) };
+const target = { position: new Vector2(0, -2.5) };
 const scene = new Scene(lightSources, lens, target);
 
 async function waitForNextFrame(): Promise<void> {
@@ -108,8 +108,8 @@ function drawScene(scene: Scene) {
             } else if (segment.type === PathType.Outgoing) {
                 ctx.moveTo(segment.start.x * 100 + canvas.width / 2, -segment.start.y * 100 + canvas.height / 2);
                 ctx.lineTo(
-                    (segment.start.x + segment.direction.x * 2) * 100 + canvas.width / 2,
-                    -(segment.start.y + segment.direction.y * 2) * 100 + canvas.height / 2,
+                    (segment.start.x + segment.direction.x * 2) * 500 + canvas.width / 2,
+                    -(segment.start.y + segment.direction.y * 2) * 500 + canvas.height / 2,
                 );
             }
         });

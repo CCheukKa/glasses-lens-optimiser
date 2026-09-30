@@ -54,11 +54,22 @@ export class Scene {
 
     private discretiseLens(sampleDensity: number = 100, traceBoundaryRadius: number = 2): DiscretisedLens {
         const pointCount = Math.ceil(Math.max(2, sampleDensity * traceBoundaryRadius));
+
+        // Prediction output as y values for the lens function at evenly spaced x values
+        // const points = Array.from({ length: pointCount }, (_, i) => {
+        //     const x = -traceBoundaryRadius + (i / (pointCount - 1)) * (2 * traceBoundaryRadius);
+        //     const y = this.lens.function(x);
+        //     return this.lens.position.add(new Vector2(x, y));
+        // });
+
+        // Prediction output as slope values for the lens function at evenly spaced x values
         const points = Array.from({ length: pointCount }, (_, i) => {
             const x = -traceBoundaryRadius + (i / (pointCount - 1)) * (2 * traceBoundaryRadius);
-            const y = this.lens.function(x);
+            const slope = this.lens.function(x);
+            const y = slope * x;
             return this.lens.position.add(new Vector2(x, y));
         });
+
         const lensSurfaces: LensSurface[] = [];
         for (let i = 0; i < points.length - 1; i++) {
             const start = points[i];
