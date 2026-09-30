@@ -21,7 +21,16 @@ export class Vector2 {
     add(other: Vector2): Vector2 {
         return new Vector2(this.x + other.x, this.y + other.y);
     }
+    subtract(other: Vector2): Vector2 {
+        return new Vector2(this.x - other.x, this.y - other.y);
+    }
+    scale(scalar: number): Vector2 {
+        return new Vector2(this.x * scalar, this.y * scalar);
+    }
     dot(other: Vector2): number {
         return this.x * other.x + this.y * other.y;
+    }
+    perpendicular(): Vector2 {
+        return new Vector2(-this.y, this.x);
     }
 }
