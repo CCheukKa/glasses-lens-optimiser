@@ -1,17 +1,21 @@
 import { NeuralNetwork } from "./lib/NeuralNetwork";
 import { PathType, RayTracer, Scene } from "./lib/RayTracer";
-import { Vector2 } from "./lib/MathExtra";
-import { GradientAscent } from "./lib/GradientAscent";
+import { MathExtra, Vector2 } from "./lib/MathExtra";
+import { GradientAscent, OptimiserType } from "./lib/GradientAscent";
 
-const LEARNING_RATE = 0.0001;
+const LEARNING_RATE = 0.001;
 const MAX_ITERATIONS = 1000000;
+const OPTIMISER = OptimiserType.Adam;
 const WORLD_TO_CANVAS_SCALE = 100;
 const OUTGOING_RAY_LENGTH = 5;
 const relu = (x: number): number => Math.max(0, x);
 const leakyRelu = (x: number): number => (x > 0 ? x : 0.01 * x);
 const tanh = (x: number): number => Math.tanh(x);
-const sigmoid = (x: number): number => 1 / (1 + Math.exp(-x));
-const neuralNetwork = new NeuralNetwork([1, 3, 5, 7, 5, 3, 1], tanh);
+const tanh2 = (x: number): number => Math.tanh(x) * 2;
+const sigmoid2 = (x: number): number => (1 / (1 + Math.exp(-x)) - 0.5) * 8;
+const a = (x: number): number => Math.sqrt(Math.abs(x)) * Math.tanh(x);
+const b = (x: number): number => MathExtra.clamp(Math.sign(x) * (Math.exp(Math.abs(x)) - 1), -10, 10);
+const neuralNetwork = new NeuralNetwork([1, 3, 5, 7, 5, 1], tanh, true);
 
 const lightSourceXStart = -1;
 const lightSourceXEnd = 1;
@@ -25,7 +29,7 @@ const lens = {
     refractiveIndex: 1.5,
     function: (x: number) => neuralNetwork.predict([x])[0],
 };
-const target = { position: new Vector2(0, -2.5) };
+const target = { position: new Vector2(0, -2) };
 const scene = new Scene(lightSources, lens, target);
 
 function toCanvasPoint(point: Vector2, canvas: HTMLCanvasElement): Vector2 {
@@ -46,7 +50,14 @@ async function train(): Promise<void> {
     console.log("Initial loss:", GradientAscent.evaluateLoss(neuralNetwork, scene));
     await waitForNextFrame();
 
-    for await (const progress of GradientAscent.gradientAscentAsync(neuralNetwork, scene, LEARNING_RATE, MAX_ITERATIONS)) {
+    const optimiser = GradientAscent.createOptimiser(OPTIMISER, neuralNetwork);
+    for await (const progress of GradientAscent.gradientAscentAsync(
+        neuralNetwork,
+        scene,
+        LEARNING_RATE,
+        MAX_ITERATIONS,
+        optimiser,
+    )) {
         drawScene(scene);
         if (progress.iteration % 10 === 0 || progress.iteration === 1) {
             console.log(`Iteration ${progress.iteration}, loss: ${progress.loss}`);

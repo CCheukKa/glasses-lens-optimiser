@@ -3,8 +3,8 @@ class Node {
     public bias: number;
 
     constructor(numInputs: number) {
-        this.weights = Array.from({ length: numInputs }, () => Math.random() * 2 - 1);
-        this.bias = numInputs === 0 ? 0 : Math.random() * 2 - 1;
+        this.weights = Array.from({ length: numInputs }, () => Math.random() - 0.5);
+        this.bias = 0;
     }
 }
 class Layer {
@@ -18,9 +18,11 @@ export class NeuralNetwork {
     public activationFunction: (x: number) => number;
     public inputNodes: number;
     public layers: Layer[];
+    public noActivationFunctionInLastLayer: boolean;
 
-    constructor(numNodesInLayer: number[], activationFunction: (x: number) => number) {
+    constructor(numNodesInLayer: number[], activationFunction: (x: number) => number, noActivationFunctionInLastLayer: boolean) {
         this.activationFunction = activationFunction;
+        this.noActivationFunctionInLastLayer = noActivationFunctionInLastLayer;
         this.inputNodes = numNodesInLayer[0]!;
         this.layers = numNodesInLayer.slice(1).map((numNodes, index) => {
             const numInputs = index === 0 ? this.inputNodes : numNodesInLayer[index]!;
@@ -37,14 +39,18 @@ export class NeuralNetwork {
         for (const layer of this.layers) {
             output = layer.nodes.map(node => {
                 const weightedSum = node.weights.reduce((sum, weight, index) => sum + weight * output[index]!, 0);
-                return this.activationFunction(weightedSum + node.bias);
+                const biasedSum = weightedSum + node.bias;
+                if (this.noActivationFunctionInLastLayer && layer === this.layers[this.layers.length - 1]) {
+                    return biasedSum;
+                }
+                return this.activationFunction(biasedSum);
             });
         }
 
         return output;
     }
     clone(): NeuralNetwork {
-        const newNetwork = new NeuralNetwork([], this.activationFunction);
+        const newNetwork = new NeuralNetwork([], this.activationFunction, this.noActivationFunctionInLastLayer);
         newNetwork.inputNodes = this.inputNodes;
         newNetwork.layers = this.layers.map(layer =>
             new Layer(layer.nodes[0]!.weights.length, layer.nodes.length)

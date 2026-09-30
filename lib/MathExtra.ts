@@ -1,4 +1,7 @@
 export namespace MathExtra {
+    export function clamp(value: number, min: number, max: number): number {
+        return Math.max(min, Math.min(max, value));
+    }
     export function distanceBetweenRayAndPoint(ray: { start: Vector2, direction: Vector2 }, point: Vector2): number {
         const rayToPoint = point.subtract(ray.start);
         const projectionLength = rayToPoint.dot(ray.direction.normalised());
