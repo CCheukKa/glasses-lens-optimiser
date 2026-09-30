@@ -3,8 +3,8 @@ import { PathType, RayTracer, Scene } from "./lib/RayTracer";
 import { MathExtra, Vector2 } from "./lib/MathExtra";
 import { GradientAscent, OptimiserType } from "./lib/GradientAscent";
 
-const LEARNING_RATE = 0.001;
-const MAX_ITERATIONS = 1000000;
+const LEARNING_RATE = 0.005;
+const MAX_ITERATIONS = 5000;
 const OPTIMISER = OptimiserType.Adam;
 const WORLD_TO_CANVAS_SCALE = 100;
 const OUTGOING_RAY_LENGTH = 5;
@@ -26,10 +26,10 @@ const lightSources = Array.from({ length: lightSourceCount }, (_, i) => {
 });
 const lens = {
     position: new Vector2(0, 1),
-    refractiveIndex: 1.5,
+    refractiveIndex: 2,
     function: (x: number) => neuralNetwork.predict([x])[0],
 };
-const target = { position: new Vector2(0, -2) };
+const target = { position: new Vector2(0.5, -2.5) };
 const scene = new Scene(lightSources, lens, target);
 
 function toCanvasPoint(point: Vector2, canvas: HTMLCanvasElement): Vector2 {

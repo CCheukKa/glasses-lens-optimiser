@@ -27,7 +27,7 @@ export namespace GradientAscent {
             if (lastSegment.type !== PathType.Outgoing) {
                 throw new Error("Last segment of ray is not Outgoing");
             }
-            return MathExtra.distanceBetweenRayAndPoint(lastSegment, scene.target.position);
+            return Math.pow(MathExtra.distanceBetweenRayAndPoint(lastSegment, scene.target.position), 2);
         }).reduce((a, b) => a + b, 0);
     }
 

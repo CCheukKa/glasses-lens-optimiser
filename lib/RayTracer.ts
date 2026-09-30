@@ -62,12 +62,12 @@ export class Scene {
         //     return this.lens.position.add(new Vector2(x, y));
         // });
 
-        // Prediction output as slope values for the lens function at evenly spaced x values
+        // Prediction output as slopes relative to the fixed midpoint of the lens.
         const points = Array.from({ length: pointCount }, (_, i) => {
-            const x = -traceBoundaryRadius + (i / (pointCount - 1)) * (2 * traceBoundaryRadius);
-            const slope = this.lens.function(x);
-            const y = slope * x;
-            return this.lens.position.add(new Vector2(x, y));
+            const relativeX = -traceBoundaryRadius + (i / (pointCount - 1)) * (2 * traceBoundaryRadius);
+            const slope = this.lens.function(relativeX);
+            const relativeY = slope * relativeX;
+            return this.lens.position.add(new Vector2(relativeX, relativeY));
         });
 
         const lensSurfaces: LensSurface[] = [];
