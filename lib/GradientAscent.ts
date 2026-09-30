@@ -3,6 +3,11 @@ import { NeuralNetwork } from "./NeuralNetwork";
 import { PathType, RayTracer, Scene } from "./RayTracer";
 
 export namespace GradientAscent {
+    export type TrainingProgress = {
+        iteration: number;
+        loss: number;
+    };
+
     export function evaluateLoss(neuralNetwork: NeuralNetwork, scene: Scene): number {
         scene.setLensFunction((x: number) => neuralNetwork.predict([x])[0]);
         return RayTracer.traceScene(scene).map(ray => {
@@ -38,6 +43,29 @@ export namespace GradientAscent {
                 }
             }
         }
+        return neuralNetwork;
+    }
+
+    export async function* gradientAscentAsync(
+        neuralNetwork: NeuralNetwork,
+        scene: Scene,
+        learningRate: number = 0.01,
+        iterations: number = 100,
+    ): AsyncGenerator<TrainingProgress, NeuralNetwork, void> {
+        for (let iter = 0; iter < iterations; iter++) {
+            const gradient = computeGradient(neuralNetwork, scene);
+            for (let i = 0; i < neuralNetwork.layers.length; i++) {
+                for (let j = 0; j < neuralNetwork.layers[i].nodes.length; j++) {
+                    neuralNetwork.layers[i].nodes[j].weights[0] -= learningRate * gradient.layers[i].nodes[j].weights[0];
+                }
+            }
+
+            yield {
+                iteration: iter + 1,
+                loss: evaluateLoss(neuralNetwork, scene),
+            };
+        }
+
         return neuralNetwork;
     }
 }

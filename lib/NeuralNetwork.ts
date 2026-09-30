@@ -3,8 +3,8 @@ class Node {
     public bias: number;
 
     constructor(numInputs: number) {
-        this.weights = Array.from({ length: numInputs }, () => Math.random() - 0.5);
-        this.bias = numInputs === 0 ? 0 : Math.random() - 0.5;
+        this.weights = Array.from({ length: numInputs }, () => Math.random() * 2 - 1);
+        this.bias = numInputs === 0 ? 0 : Math.random() * 2 - 1;
     }
 }
 class Layer {
@@ -15,12 +15,12 @@ class Layer {
     }
 }
 export class NeuralNetwork {
-    public activationFunction = (x: number): number => Math.tanh(x);
-    public mutationRate = 0.1;
+    public activationFunction: (x: number) => number;
     public inputNodes: number;
     public layers: Layer[];
 
-    constructor(numNodesInLayer: number[]) {
+    constructor(numNodesInLayer: number[], activationFunction: (x: number) => number) {
+        this.activationFunction = activationFunction;
         this.inputNodes = numNodesInLayer[0]!;
         this.layers = numNodesInLayer.slice(1).map((numNodes, index) => {
             const numInputs = index === 0 ? this.inputNodes : numNodesInLayer[index]!;
@@ -43,17 +43,8 @@ export class NeuralNetwork {
 
         return output;
     }
-    mutate() {
-        this.layers.forEach(layer => {
-            layer.nodes.forEach(node => {
-                node.weights = node.weights.map(weight => weight + (Math.random() - 0.5) * this.mutationRate);
-                node.bias += (Math.random() - 0.5) * this.mutationRate;
-            });
-        });
-        return this;
-    }
     clone(): NeuralNetwork {
-        const newNetwork = new NeuralNetwork([]);
+        const newNetwork = new NeuralNetwork([], this.activationFunction);
         newNetwork.inputNodes = this.inputNodes;
         newNetwork.layers = this.layers.map(layer =>
             new Layer(layer.nodes[0]!.weights.length, layer.nodes.length)
@@ -71,7 +62,6 @@ export class NeuralNetwork {
         let debugInfo: string[] = [];
         debugInfo.push(`Neural Network Debug Info:`);
         debugInfo.push(`Activation Function: ${this.activationFunction.toString()}`);
-        debugInfo.push(`Mutation Rate: ${this.mutationRate}`);
         debugInfo.push(`Layers: [${this.inputNodes}] -> ${this.layers.map((layer, index) => index === this.layers.length - 1 ? `[${layer.nodes.length}]` : layer.nodes.length).join(" -> ")}`);
         if (verbose) {
             this.layers.forEach((layer, index) => {

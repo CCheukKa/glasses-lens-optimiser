@@ -3,14 +3,20 @@ import { PathType, RayTracer, Scene } from "./lib/RayTracer";
 import { Vector2 } from "./lib/MathExtra";
 import { GradientAscent } from "./lib/GradientAscent";
 
-const neuralNetwork = new NeuralNetwork([1, 3, 5, 5, 3, 1]);
+const LEARNING_RATE = 0.001;
+const MAX_ITERATIONS = 1000000;
+const relu = (x: number): number => Math.max(0, x);
+const leakyRelu = (x: number): number => (x > 0 ? x : 0.01 * x);
+const tanh = (x: number): number => Math.tanh(x);
+const sigmoid = (x: number): number => 1 / (1 + Math.exp(-x));
+const neuralNetwork = new NeuralNetwork([1, 3, 5, 7, 5, 3, 1], tanh);
 
 const lightSourceXStart = -1;
 const lightSourceXEnd = 1;
 const lightSourceCount = 20;
 const lightSources = Array.from({ length: lightSourceCount }, (_, i) => {
     const x = lightSourceXStart + (i / (lightSourceCount - 1)) * (lightSourceXEnd - lightSourceXStart);
-    return { position: new Vector2(x, 1), direction: new Vector2(0, -1) };
+    return { position: new Vector2(x, 2), direction: new Vector2(0, -1) };
 });
 const lens = {
     position: new Vector2(0, 0),
@@ -20,7 +26,28 @@ const lens = {
 const target = { position: new Vector2(0, -1) };
 const scene = new Scene(lightSources, lens, target);
 
-drawScene(scene);
+async function waitForNextFrame(): Promise<void> {
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+}
+
+train();
+
+async function train(): Promise<void> {
+    drawScene(scene);
+    console.log("Initial loss:", GradientAscent.evaluateLoss(neuralNetwork, scene));
+    await waitForNextFrame();
+
+    for await (const progress of GradientAscent.gradientAscentAsync(neuralNetwork, scene, LEARNING_RATE, MAX_ITERATIONS)) {
+        drawScene(scene);
+        if (progress.iteration % 10 === 0 || progress.iteration === 1) {
+            console.log(`Iteration ${progress.iteration}, loss: ${progress.loss}`);
+        }
+        await waitForNextFrame();
+    }
+
+    console.log("Training complete. Final loss:", GradientAscent.evaluateLoss(neuralNetwork, scene));
+}
+
 function drawScene(scene: Scene) {
     const canvas = document.getElementById("myCanvas") as HTMLCanvasElement;
     const ctx = canvas.getContext("2d");
@@ -72,7 +99,6 @@ function drawScene(scene: Scene) {
 
     // draw rays
     const rays = RayTracer.traceScene(scene);
-    console.log("Rays:", rays);
     rays.forEach(ray => {
         ctx.beginPath();
         ray.forEach(segment => {
@@ -92,8 +118,3 @@ function drawScene(scene: Scene) {
         ctx.stroke();
     });
 }
-
-console.log(GradientAscent.evaluateLoss(neuralNetwork, scene));
-console.log(GradientAscent.computeGradient(neuralNetwork, scene));
-const updatedNeuralNetwork = GradientAscent.gradientAscent(neuralNetwork, scene, 0.01, 1000);
-console.log(GradientAscent.evaluateLoss(updatedNeuralNetwork, scene));
