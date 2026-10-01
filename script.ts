@@ -22,10 +22,22 @@ const neuralNetwork = new NeuralNetwork([1, 3, 5, 7, 5, 2], tanh, true);
 const lightSourceXStart = -2;
 const lightSourceXEnd = 2;
 const lightSourceCount = 20;
-const lightSources = Array.from({ length: lightSourceCount }, (_, i) => {
+const lightSourcesParallel = Array.from({ length: lightSourceCount }, (_, i) => {
     const x = lightSourceXStart + (i / (lightSourceCount - 1)) * (lightSourceXEnd - lightSourceXStart);
     return { position: new Vector2(x, 2.5), direction: new Vector2(0, -1) };
 });
+
+const lightSourceStartAngle = -Math.PI / 4;
+const lightSourceEndAngle = Math.PI / 4;
+const lightSourceAngleCount = 20;
+const lightSourcesPoint = Array.from({ length: lightSourceAngleCount }, (_, i) => {
+    const angle = lightSourceStartAngle + (i / (lightSourceAngleCount - 1)) * (lightSourceEndAngle - lightSourceStartAngle);
+    const direction = new Vector2(Math.sin(angle), -Math.cos(angle));
+    return { position: new Vector2(0, 2.5), direction };
+});
+
+const lightSources = lightSourcesPoint;
+
 const lens = {
     position: new Vector2(0, 1),
     refractiveIndex: 2,
