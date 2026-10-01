@@ -19,8 +19,8 @@ const a = (x: number): number => Math.sqrt(Math.abs(x)) * Math.tanh(x);
 const b = (x: number): number => MathExtra.clamp(Math.sign(x) * (Math.exp(Math.abs(x)) - 1), -10, 10);
 const neuralNetwork = new NeuralNetwork([1, 3, 5, 7, 5, 2], tanh, true);
 
-const lightSourceXStart = -1;
-const lightSourceXEnd = 1;
+const lightSourceXStart = -2;
+const lightSourceXEnd = 2;
 const lightSourceCount = 20;
 const lightSources = Array.from({ length: lightSourceCount }, (_, i) => {
     const x = lightSourceXStart + (i / (lightSourceCount - 1)) * (lightSourceXEnd - lightSourceXStart);
