@@ -7,7 +7,7 @@ type LightSource = {
 type Lens = {
     position: Vector2;
     refractiveIndex: number;
-    readonly function: (x: number) => number;
+    readonly function: (x: number) => number[];
 };
 type Target = {
     position: Vector2;
@@ -47,12 +47,12 @@ export class Scene {
         return this._discretisedLens;
     }
 
-    public setLensFunction(newFunction: (x: number) => number) {
+    public setLensFunction(newFunction: (x: number) => number[]) {
         this._lens = { ...this._lens, function: newFunction };
         this._discretisedLens = this.discretiseLens();
     }
 
-    private discretiseLens(sampleDensity: number = 100, traceBoundaryRadius: number = 2): DiscretisedLens {
+    private discretiseLens(sampleDensity: number = 100, traceBoundaryRadius: number = 2, surfaceThickness: number = 0.5): DiscretisedLens {
         const pointCount = Math.ceil(Math.max(2, sampleDensity * traceBoundaryRadius));
 
         // Prediction output as y values for the lens function at evenly spaced x values
@@ -63,18 +63,30 @@ export class Scene {
         // });
 
         // Prediction output as slopes relative to the fixed midpoint of the lens.
-        const points = Array.from({ length: pointCount }, (_, i) => {
+        const topSurfacePoints = Array.from({ length: pointCount }, (_, i) => {
             const relativeX = -traceBoundaryRadius + (i / (pointCount - 1)) * (2 * traceBoundaryRadius);
-            const slope = this.lens.function(relativeX);
+            const slope = this.lens.function(relativeX)[0];
             const relativeY = slope * relativeX;
-            return this.lens.position.add(new Vector2(relativeX, relativeY));
+            return this.lens.position.add(new Vector2(relativeX, relativeY + surfaceThickness / 2));
+        });
+        const bottomSurfacePoints = Array.from({ length: pointCount }, (_, i) => {
+            const relativeX = -traceBoundaryRadius + (i / (pointCount - 1)) * (2 * traceBoundaryRadius);
+            const slope = this.lens.function(relativeX)[1];
+            const relativeY = slope * relativeX;
+            return this.lens.position.add(new Vector2(relativeX, relativeY - surfaceThickness / 2));
         });
 
         const lensSurfaces: LensSurface[] = [];
-        for (let i = 0; i < points.length - 1; i++) {
-            const start = points[i];
-            const end = points[i + 1];
+        for (let i = 0; i < topSurfacePoints.length - 1; i++) {
+            const start = topSurfacePoints[i];
+            const end = topSurfacePoints[i + 1];
             const normal = end.subtract(start).normalised().perpendicular();
+            lensSurfaces.push({ start, end, normal });
+        }
+        for (let i = 0; i < bottomSurfacePoints.length - 1; i++) {
+            const start = bottomSurfacePoints[i];
+            const end = bottomSurfacePoints[i + 1];
+            const normal = end.subtract(start).normalised().perpendicular().scale(-1);
             lensSurfaces.push({ start, end, normal });
         }
         return lensSurfaces;
@@ -96,39 +108,64 @@ export class RayTracer {
     }
 
     private static traceRay(lightSource: LightSource, lens: DiscretisedLens, refractiveIndex: number): Ray {
-        let nearestIntersection: { point: Vector2; surface: LensSurface; distance: number } | undefined;
+        const paths: IntersectionPath[] = [];
+        let start = lightSource.position;
+        let direction = lightSource.direction;
 
+        for (let interaction = 0; interaction < 2; interaction++) {
+            const nearestIntersection = this.findNearestIntersection(start, direction, lens);
+            if (!nearestIntersection) {
+                break;
+            }
+
+            paths.push({
+                type: PathType.Intersection,
+                start,
+                end: nearestIntersection.point,
+            });
+
+            const normal = nearestIntersection.surface.normal;
+            const enteringGlass = direction.dot(normal) < 0;
+            const eta = enteringGlass ? 1 / refractiveIndex : refractiveIndex;
+            direction = this.refract(direction, normal, eta);
+            start = nearestIntersection.point;
+        }
+
+        return [
+            ...paths,
+            { type: PathType.Outgoing, start, direction },
+        ];
+    }
+
+    private static findNearestIntersection(
+        origin: Vector2,
+        direction: Vector2,
+        lens: DiscretisedLens,
+    ): { point: Vector2; surface: LensSurface; distance: number } | undefined {
+        let nearestIntersection: { point: Vector2; surface: LensSurface; distance: number } | undefined;
         for (const surface of lens) {
-            const intersection = this.intersectRayWithSurface(lightSource.position, lightSource.direction, surface);
+            const intersection = this.intersectRayWithSurface(origin, direction, surface);
             if (intersection && (!nearestIntersection || intersection.distance < nearestIntersection.distance)) {
                 nearestIntersection = { ...intersection, surface };
             }
         }
+        return nearestIntersection;
+    }
 
-        if (!nearestIntersection) {
-            return [{ type: PathType.Outgoing, start: lightSource.position, direction: lightSource.direction }];
-        }
-
-        const incoming = lightSource.direction;
-        let normal = nearestIntersection.surface.normal;
-        if (incoming.dot(normal) > 0) {
-            normal = normal.scale(-1);
-        }
-
-        const eta = 1 / refractiveIndex;
-        const cosineIncident = -incoming.dot(normal);
+    private static refract(direction: Vector2, surfaceNormal: Vector2, eta: number): Vector2 {
+        const normal = direction.dot(surfaceNormal) > 0
+            ? surfaceNormal.scale(-1)
+            : surfaceNormal;
+        const cosineIncident = -direction.dot(normal);
         const sineSquaredTransmitted = eta * eta * (1 - cosineIncident * cosineIncident);
-        const outgoing = sineSquaredTransmitted > 1
-            ? incoming.subtract(normal.scale(2 * incoming.dot(normal))).normalised()
-            : incoming
-                .scale(eta)
-                .add(normal.scale(eta * cosineIncident - Math.sqrt(1 - sineSquaredTransmitted)))
-                .normalised();
+        if (sineSquaredTransmitted > 1) {
+            return direction.subtract(normal.scale(2 * direction.dot(normal))).normalised();
+        }
 
-        return [
-            { type: PathType.Intersection, start: lightSource.position, end: nearestIntersection.point },
-            { type: PathType.Outgoing, start: nearestIntersection.point, direction: outgoing },
-        ];
+        return direction
+            .scale(eta)
+            .add(normal.scale(eta * cosineIncident - Math.sqrt(1 - sineSquaredTransmitted)))
+            .normalised();
     }
 
     private static intersectRayWithSurface(

@@ -21,7 +21,7 @@ export namespace GradientAscent {
     };
 
     export function evaluateLoss(neuralNetwork: NeuralNetwork, scene: Scene): number {
-        scene.setLensFunction((x: number) => neuralNetwork.predict([x])[0]);
+        scene.setLensFunction((x: number) => neuralNetwork.predict([x]));
         return RayTracer.traceScene(scene).map(ray => {
             const lastSegment = ray[ray.length - 1];
             if (lastSegment.type !== PathType.Outgoing) {

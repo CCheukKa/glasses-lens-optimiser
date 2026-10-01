@@ -17,7 +17,7 @@ const tanh2 = (x: number): number => Math.tanh(x) * 2;
 const sigmoid2 = (x: number): number => (1 / (1 + Math.exp(-x)) - 0.5) * 8;
 const a = (x: number): number => Math.sqrt(Math.abs(x)) * Math.tanh(x);
 const b = (x: number): number => MathExtra.clamp(Math.sign(x) * (Math.exp(Math.abs(x)) - 1), -10, 10);
-const neuralNetwork = new NeuralNetwork([1, 3, 5, 7, 5, 1], tanh, true);
+const neuralNetwork = new NeuralNetwork([1, 3, 5, 7, 5, 2], tanh, true);
 
 const lightSourceXStart = -1;
 const lightSourceXEnd = 1;
@@ -29,9 +29,9 @@ const lightSources = Array.from({ length: lightSourceCount }, (_, i) => {
 const lens = {
     position: new Vector2(0, 1),
     refractiveIndex: 2,
-    function: (x: number) => neuralNetwork.predict([x])[0],
+    function: (x: number) => neuralNetwork.predict([x]),
 };
-const target = { position: new Vector2(0.5, -2.5) };
+const target = { position: new Vector2(0, -2.5) };
 const scene = new Scene(lightSources, lens, target);
 
 function toCanvasPoint(point: Vector2, canvas: HTMLCanvasElement): Vector2 {
@@ -45,8 +45,9 @@ async function waitForNextFrame(): Promise<void> {
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 }
 
-train();
+// drawScene(scene);
 
+train();
 async function train(): Promise<void> {
     drawScene(scene);
     const initialLoss = GradientAscent.evaluateLoss(neuralNetwork, scene);
