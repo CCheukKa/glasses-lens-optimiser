@@ -52,7 +52,7 @@ export class Scene {
         this._discretisedLens = this.discretiseLens();
     }
 
-    private discretiseLens(sampleDensity: number = 100, traceBoundaryRadius: number = 3, surfaceThickness: number = 1): DiscretisedLens {
+    private discretiseLens(sampleDensity: number = 100, traceBoundaryRadius: number = 3, surfaceThickness: number = 1.5): DiscretisedLens {
         const pointCount = Math.ceil(Math.max(2, sampleDensity * traceBoundaryRadius));
 
         // Prediction output as y values for the lens function at evenly spaced x values
